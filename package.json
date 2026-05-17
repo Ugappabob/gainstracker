@@ -1,0 +1,35 @@
+{
+  "name": "gainstracker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && firebase deploy",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "deploy:firestore": "firebase deploy --only firestore",
+    "import:workouts": "node scripts/importWorkouts.mjs"
+  },
+  "dependencies": {
+    "firebase": "^11.6.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.0",
+    "recharts": "^2.15.4"
+  },
+  "devDependencies": {
+    "@google-cloud/firestore": "^7.11.0",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "firebase-admin": "^13.4.0",
+    "firebase-tools": "^13.35.1",
+    "google-auth-library": "^9.15.1",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.4",
+    "vite-plugin-pwa": "^1.0.0",
+    "xlsx": "^0.18.5"
+  }
+}

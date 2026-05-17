@@ -1,0 +1,302 @@
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+
+
+    function signedIn() {
+
+      return request.auth != null;
+
+    }
+
+
+
+    function isSelf(uid) {
+
+      return signedIn() && request.auth.uid == uid;
+
+    }
+
+
+
+    function userExists(uid) {
+
+      return exists(/databases/$(database)/documents/users/$(uid));
+
+    }
+
+
+
+    function userData(uid) {
+
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+
+    }
+
+
+
+    function headCoachUid() {
+
+      return get(/databases/$(database)/documents/config/headCoach).data.uid;
+
+    }
+
+
+
+    function headCoachConfigExists() {
+
+      return exists(/databases/$(database)/documents/config/headCoach);
+
+    }
+
+
+
+    /** stevenfhulett@gmail.com — identified by config UID (preferred) or auth email. */
+
+    function isHeadCoach() {
+
+      return signedIn() && (
+
+        (headCoachConfigExists() && request.auth.uid == headCoachUid())
+
+        || (request.auth.token.email != null && request.auth.token.email == 'stevenfhulett@gmail.com')
+
+      );
+
+    }
+
+
+
+    function coachCanReadAthlete(athleteUid) {
+
+      return isHeadCoach()
+
+        && userExists(athleteUid)
+
+        && userData(athleteUid).role == 'athlete'
+
+        && userData(athleteUid).coachId == request.auth.uid;
+
+    }
+
+
+
+    function canReadAthlete(athleteUid) {
+
+      return isSelf(athleteUid) || coachCanReadAthlete(athleteUid);
+
+    }
+
+
+
+    match /config/headCoach {
+
+      allow read: if signedIn();
+
+      allow create: if isHeadCoach()
+
+        && request.resource.data.uid == request.auth.uid
+
+        && request.resource.data.email == 'stevenfhulett@gmail.com';
+
+      allow update, delete: if false;
+
+    }
+
+
+
+    match /users/{userId} {
+
+      // OR in `read` breaks collection queries (e.g. roster). Use get vs list.
+
+      allow get: if isSelf(userId) || coachCanReadAthlete(userId);
+
+      allow list: if isHeadCoach()
+
+        && resource.data.coachId == request.auth.uid
+
+        && resource.data.role == 'athlete';
+
+      allow create: if isSelf(userId) && (
+
+        (
+
+          request.resource.data.role == 'athlete'
+
+          && headCoachConfigExists()
+
+          && request.resource.data.coachId == headCoachUid()
+
+        )
+
+        || (
+
+          request.resource.data.role == 'coach'
+
+          && request.resource.data.coachId == null
+
+          && isHeadCoach()
+
+        )
+
+      );
+
+      allow update: if isSelf(userId)
+
+        && request.resource.data.role == resource.data.role
+
+        && request.resource.data.coachId == resource.data.coachId
+
+        || (
+
+          isHeadCoach()
+
+          && isSelf(userId)
+
+          && resource.data.role != 'coach'
+
+          && request.resource.data.role == 'coach'
+
+          && request.resource.data.coachId == null
+
+        )
+
+        || (
+
+          isHeadCoach()
+
+          && resource.data.role == 'athlete'
+
+          && request.resource.data.role == 'athlete'
+
+          && request.resource.data.coachId == request.auth.uid
+
+          && (resource.data.coachId == null || resource.data.coachId == request.auth.uid)
+
+        );
+
+      allow delete: if false;
+
+    }
+
+
+
+    match /exercises/{exId} {
+
+      allow read: if signedIn();
+
+      allow create, update, delete: if isHeadCoach()
+
+        && userExists(request.auth.uid)
+
+        && userData(request.auth.uid).role == 'coach';
+
+    }
+
+
+
+    match /templates/{tplId} {
+
+      allow read: if signedIn();
+
+      allow create, update, delete: if isHeadCoach()
+
+        && userExists(request.auth.uid)
+
+        && userData(request.auth.uid).role == 'coach';
+
+    }
+
+
+
+    match /workouts/{workoutId} {
+
+      allow get: if signedIn() && canReadAthlete(resource.data.ownerUid);
+
+      allow list: if signedIn() && (
+
+        resource.data.ownerUid == request.auth.uid
+
+        || (
+
+          isHeadCoach()
+
+          && userExists(resource.data.ownerUid)
+
+          && userData(resource.data.ownerUid).role == 'athlete'
+
+          && userData(resource.data.ownerUid).coachId == request.auth.uid
+
+        )
+
+      );
+
+      allow create: if signedIn()
+
+        && request.resource.data.ownerUid == request.auth.uid
+
+        && request.resource.data.status == 'in_progress';
+
+      allow delete: if signedIn() && isSelf(resource.data.ownerUid);
+
+      allow update: if signedIn()
+
+        && isSelf(resource.data.ownerUid)
+
+        && request.resource.data.ownerUid == resource.data.ownerUid
+
+        && (
+
+          request.resource.data.status == resource.data.status
+
+          || (resource.data.status == 'in_progress' && request.resource.data.status == 'completed')
+
+        );
+
+
+
+      match /lines/{lineId} {
+
+        allow read: if signedIn()
+
+          && canReadAthlete(get(/databases/$(database)/documents/workouts/$(workoutId)).data.ownerUid);
+
+        allow create, update, delete: if signedIn()
+
+          && isSelf(get(/databases/$(database)/documents/workouts/$(workoutId)).data.ownerUid);
+
+      }
+
+    }
+
+
+
+    match /exerciseHistory/{entryId} {
+      allow get: if signedIn() && canReadAthlete(resource.data.userId);
+      // OR in one list rule breaks queries; split get vs list (same fix as users/roster).
+      allow list: if signedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isHeadCoach()
+        && userExists(resource.data.userId)
+        && userData(resource.data.userId).role == 'athlete'
+        && userData(resource.data.userId).coachId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if signedIn() && isSelf(resource.data.userId);
+      allow update: if false;
+    }
+
+
+
+    match /{document=**} {
+
+      allow read, write: if false;
+
+    }
+
+  }
+
+}
+
+
