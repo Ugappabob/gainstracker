@@ -9,6 +9,8 @@ export interface UserProfile {
   role: UserRole;
   /** If set, this athlete's data may be read by the coach with this uid. */
   coachId: string | null;
+  /** Private notes for the coach (roster only). */
+  coachNotes?: string | null;
 }
 
 export interface Exercise {
@@ -65,3 +67,7 @@ export interface ExerciseHistoryEntry {
   completedAt: Timestamp;
   sets: WorkoutSet[];
 }
+
+export type RosterAthlete = UserProfile & {
+  lastWorkoutAt: Timestamp | null;
+};

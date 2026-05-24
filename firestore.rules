@@ -160,6 +160,8 @@ service cloud.firestore {
 
         && request.resource.data.coachId == resource.data.coachId
 
+        && request.resource.data.get('coachNotes', null) == resource.data.get('coachNotes', null)
+
         || (
 
           isHeadCoach()
@@ -185,6 +187,20 @@ service cloud.firestore {
           && request.resource.data.coachId == request.auth.uid
 
           && (resource.data.coachId == null || resource.data.coachId == request.auth.uid)
+
+        )
+
+        || (
+
+          isHeadCoach()
+
+          && resource.data.role == 'athlete'
+
+          && resource.data.coachId == request.auth.uid
+
+          && request.resource.data.role == 'athlete'
+
+          && request.resource.data.coachId == null
 
         );
 

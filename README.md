@@ -37,6 +37,13 @@ Fill `.env` with Firebase web app config from the [Firebase console](https://con
 2. Athlete opens link → sign up with email, password, and code
 3. Athlete appears on coach roster automatically
 
+See [docs/ONBOARDING.md](docs/ONBOARDING.md) for GitHub, CI, deploy, and export steps.
+
+## Export / backup
+
+- **Coach:** Roster → Export CSV (per athlete)
+- **Athlete:** History → Export CSV
+
 ## Deploy
 
 ```bat

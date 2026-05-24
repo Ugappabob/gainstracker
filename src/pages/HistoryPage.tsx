@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubjectUser } from '@/hooks/useSubjectUser';
+import { exportWorkoutsCsv } from '@/services/export';
 import { createWorkoutFromPrevious, deleteWorkout, listWorkoutsPage, WORKOUT_HISTORY_PAGE_SIZE } from '@/services/workouts';
 import type { Workout } from '@/types/models';
 import { formatWorkoutDate } from '@/utils/formatWorkoutDate';
@@ -47,6 +48,7 @@ export default function HistoryPage() {
   const [err, setErr] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [repeatingId, setRepeatingId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const yearOptions = useMemo(() => {
     const end = new Date().getFullYear();
@@ -132,6 +134,20 @@ export default function HistoryPage() {
     }
   };
 
+  const handleExport = async () => {
+    if (!subjectUid || !user) return;
+    setExporting(true);
+    setErr(null);
+    try {
+      const stem = user.displayName || user.email || user.uid;
+      await exportWorkoutsCsv(subjectUid, stem);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (authLoading || subjectLoading) return <div className="layout muted">Loading…</div>;
   if (!user) return <div className="layout muted">Sign in required.</div>;
 
@@ -142,9 +158,21 @@ export default function HistoryPage() {
     <div className="layout stack">
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
         <h1 style={{ margin: 0 }}>{isCoachView ? 'Athlete history' : 'History'}</h1>
-        <Link to={isCoachView ? '/roster' : '/'} className="btn btn-ghost" style={{ textDecoration: 'none' }}>
-          {isCoachView ? 'Roster' : 'Home'}
-        </Link>
+        <div className="row" style={{ gap: '0.35rem', flexWrap: 'wrap' }}>
+          {canDelete && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={exporting || loading}
+              onClick={() => void handleExport()}
+            >
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+          )}
+          <Link to={isCoachView ? '/roster' : '/'} className="btn btn-ghost" style={{ textDecoration: 'none' }}>
+            {isCoachView ? 'Roster' : 'Home'}
+          </Link>
+        </div>
       </div>
 
       {isCoachView && (

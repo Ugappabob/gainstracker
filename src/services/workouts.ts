@@ -284,3 +284,17 @@ export async function listWorkoutsPage(
     hasMore,
   };
 }
+
+/** Loads every workout for an owner (newest first). Used for CSV export. */
+export async function listAllWorkouts(ownerUid: string): Promise<Workout[]> {
+  const all: Workout[] = [];
+  let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+  let hasMore = true;
+  while (hasMore) {
+    const page = await listWorkoutsPage(ownerUid, { cursor, pageSize: 100 });
+    all.push(...page.workouts);
+    cursor = page.lastDoc;
+    hasMore = page.hasMore;
+  }
+  return all;
+}
