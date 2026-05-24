@@ -7,6 +7,7 @@ import HomePage from '@/pages/HomePage';
 import LoginPage from '@/pages/LoginPage';
 import TrendsPage from '@/pages/TrendsPage';
 import RosterPage from '@/pages/RosterPage';
+import TemplatesPage from '@/pages/TemplatesPage';
 
 function PrivateRoute({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth();
@@ -41,6 +42,14 @@ export default function App() {
         element={
           <PrivateRoute>
             <RosterPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/templates"
+        element={
+          <PrivateRoute>
+            <TemplatesPage />
           </PrivateRoute>
         }
       />

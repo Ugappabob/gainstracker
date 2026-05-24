@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { isHeadCoachProfile } from '@/constants/coach';
 import { ExerciseHistoryPanel } from '@/components/ExerciseHistoryPanel';
+import ExercisePicker from '@/components/ExercisePicker';
 import {
   deleteWorkout,
   addLine,
@@ -13,8 +14,8 @@ import {
   syncExerciseHistoryFromWorkout,
   updateLineSets,
 } from '@/services/workouts';
-import type { Workout, WorkoutLine, WorkoutSet } from '@/types/models';
-import { customExerciseIdFromName } from '@/utils/customExerciseId';
+import { listExercises } from '@/services/library';
+import type { Exercise, Workout, WorkoutLine, WorkoutSet } from '@/types/models';
 
 function SetsEditor({
   sets,
@@ -169,7 +170,7 @@ export default function ActiveWorkoutPage() {
   const { user, profile } = useAuth();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [lines, setLines] = useState<WorkoutLine[]>([]);
-  const [exerciseNameInput, setExerciseNameInput] = useState('');
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -199,6 +200,12 @@ export default function ActiveWorkoutPage() {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    void listExercises()
+      .then(setExercises)
+      .catch(() => setExercises([]));
+  }, []);
+
   const sessionCompleted = workout?.status === 'completed';
   const sessionInProgress = workout?.status === 'in_progress';
   const athleteUid = workout?.ownerUid ?? user?.uid ?? '';
@@ -211,24 +218,20 @@ export default function ActiveWorkoutPage() {
 
   const nextOrder = useMemo(() => (lines.length ? Math.max(...lines.map((l) => l.order)) + 1 : 0), [lines]);
 
-  const addExerciseByName = async () => {
+  const addExercise = async (exerciseId: string, exerciseName: string) => {
     if (!id || !user) return;
-    const name = exerciseNameInput.trim();
-    if (!name) return;
     setBusy(true);
     setError(null);
     try {
-      const exerciseId = customExerciseIdFromName(name);
       await addLine(id, {
         exerciseId,
-        exerciseName: name,
+        exerciseName,
         order: nextOrder,
         sets: [{ reps: 8, weight: 0 }],
       });
       if (sessionCompleted) {
         await syncExerciseHistoryFromWorkout(id, athleteUid);
       }
-      setExerciseNameInput('');
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not add exercise.');
@@ -330,27 +333,9 @@ export default function ActiveWorkoutPage() {
       <div className="card stack">
         <h2>Add exercise</h2>
         <p className="muted" style={{ margin: 0 }}>
-          Type any name (e.g. “Paused bench”). Matching names share history.
+          Pick from the library or add a custom name. Library names keep history consistent.
         </p>
-        <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <label className="stack" style={{ flex: 1, minWidth: '12rem', gap: '0.25rem' }}>
-            <span className="muted">Exercise name</span>
-            <input
-              value={exerciseNameInput}
-              onChange={(e) => setExerciseNameInput(e.target.value)}
-              placeholder="e.g. Romanian deadlift"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void addExerciseByName();
-                }
-              }}
-            />
-          </label>
-          <button type="button" className="btn btn-primary" disabled={busy || !exerciseNameInput.trim()} onClick={() => void addExerciseByName()}>
-            Add
-          </button>
-        </div>
+        <ExercisePicker exercises={exercises} disabled={busy} onPick={(eid, ename) => void addExercise(eid, ename)} />
       </div>
       )}
 

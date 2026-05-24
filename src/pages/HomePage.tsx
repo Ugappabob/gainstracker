@@ -146,9 +146,14 @@ export default function HomePage() {
           Trends
         </Link>
         {isHeadCoachProfile(profile, user.email) && (
-          <Link to="/roster" className="btn btn-ghost" style={{ textDecoration: 'none' }}>
-            Roster
-          </Link>
+          <>
+            <Link to="/roster" className="btn btn-ghost" style={{ textDecoration: 'none' }}>
+              Roster
+            </Link>
+            <Link to="/templates" className="btn btn-ghost" style={{ textDecoration: 'none' }}>
+              Templates
+            </Link>
+          </>
         )}
       </nav>
 
@@ -183,7 +188,7 @@ export default function HomePage() {
         <div className="card stack">
           <h2>Coach</h2>
           <p className="muted" style={{ margin: 0 }}>
-            Install default exercises and a starter template (idempotent).
+            Install starter exercises, or manage templates and the library under Templates.
           </p>
           <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void installLibrary()}>
             {busy === 'seed' ? 'Installing…' : 'Install starter library'}
@@ -211,8 +216,8 @@ export default function HomePage() {
         {!loadErr && templates.length === 0 && (
           <p className="muted">
             {isHeadCoachProfile(profile, user.email)
-              ? 'No templates yet. Use Install starter library above.'
-              : 'No templates yet. Ask your coach to install the starter library (coach account only).'}
+              ? 'No templates yet. Open Templates to create one, or install the starter library.'
+              : 'No templates yet. Ask your coach to add workout templates.'}
           </p>
         )}
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }} className="stack">
