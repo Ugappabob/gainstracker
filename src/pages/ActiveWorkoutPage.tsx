@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isHeadCoachProfile } from '@/constants/coach';
 import { ExerciseHistoryPanel } from '@/components/ExerciseHistoryPanel';
 import ExercisePicker from '@/components/ExercisePicker';
+import OfflineBanner from '@/components/OfflineBanner';
 import {
   deleteWorkout,
   addLine,
@@ -313,6 +314,8 @@ export default function ActiveWorkoutPage() {
           Home
         </Link>
       </div>
+
+      {!readOnly && <OfflineBanner />}
 
       {readOnly && (
         <p className="muted" style={{ margin: 0 }}>

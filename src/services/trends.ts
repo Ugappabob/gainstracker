@@ -79,3 +79,23 @@ export async function fetchExerciseTrendPage(
     hasMore,
   };
 }
+
+/** Paginates until all sessions for this exercise are loaded (oldest → newest). */
+export async function fetchAllExerciseTrend(
+  userId: string,
+  exerciseId: string,
+  opts: { onProgress?: (loadedCount: number) => void } = {},
+): Promise<TrendPoint[]> {
+  const all: TrendPoint[] = [];
+  let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+
+  for (;;) {
+    const page = await fetchExerciseTrendPage(userId, exerciseId, { cursor });
+    all.push(...page.points);
+    opts.onProgress?.(all.length);
+    if (!page.hasMore) break;
+    cursor = page.lastDoc;
+  }
+
+  return [...all].reverse();
+}

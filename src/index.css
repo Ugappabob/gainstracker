@@ -110,6 +110,16 @@ h2 {
   margin: 0 0 0.35rem;
 }
 
+.offline-banner {
+  background: #422006;
+  border: 1px solid #a16207;
+  color: #fde68a;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
 .warning-banner {
   background: #422006;
   border: 1px solid #a16207;

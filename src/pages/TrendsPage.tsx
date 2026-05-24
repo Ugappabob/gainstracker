@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubjectUser } from '@/hooks/useSubjectUser';
 import TrendLineChart, { type TrendChartRow } from '@/components/trends/TrendLineChart';
 import { listExercisesForTrends, type TrendExercise } from '@/services/library';
-import { fetchExerciseTrendPage, TREND_PAGE_SIZE, type TrendPoint } from '@/services/trends';
+import { fetchExerciseTrendPage, type TrendPoint } from '@/services/trends';
 import { E1RM_REP_CAP } from '@/utils/oneRepMax';
 
 function pointDateMs(p: TrendPoint): number {
@@ -40,11 +40,9 @@ export default function TrendsPage() {
   const [exercisesErr, setExercisesErr] = useState<string | null>(null);
   const [exercisesLoading, setExercisesLoading] = useState(true);
   const [points, setPoints] = useState<TrendPoint[]>([]);
-  const [trendCursor, setTrendCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [hasMoreTrend, setHasMoreTrend] = useState(false);
   const [trendErr, setTrendErr] = useState<string | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
-  const [trendLoadingMore, setTrendLoadingMore] = useState(false);
+  const [loadProgress, setLoadProgress] = useState(0);
 
   useEffect(() => {
     if (!subjectUid) return;
@@ -67,44 +65,34 @@ export default function TrendsPage() {
     })();
   }, [subjectUid]);
 
-  const loadTrendFirst = useCallback(async () => {
+  const loadAllTrend = useCallback(async () => {
     if (!subjectUid || !exerciseId) return;
     setTrendLoading(true);
     setTrendErr(null);
+    setLoadProgress(0);
+    setPoints([]);
     try {
-      const page = await fetchExerciseTrendPage(subjectUid, exerciseId);
-      setPoints([...page.points].reverse());
-      setTrendCursor(page.lastDoc);
-      setHasMoreTrend(page.hasMore);
+      const batch: TrendPoint[] = [];
+      let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+      for (;;) {
+        const page = await fetchExerciseTrendPage(subjectUid, exerciseId, { cursor });
+        batch.push(...page.points);
+        setPoints([...batch].reverse());
+        setLoadProgress(batch.length);
+        if (!page.hasMore) break;
+        cursor = page.lastDoc;
+      }
     } catch (e) {
       setTrendErr(e instanceof Error ? e.message : 'Failed to load trend');
       setPoints([]);
-      setTrendCursor(null);
-      setHasMoreTrend(false);
     } finally {
       setTrendLoading(false);
     }
   }, [subjectUid, exerciseId]);
 
   useEffect(() => {
-    void loadTrendFirst();
-  }, [loadTrendFirst]);
-
-  const loadTrendMore = async () => {
-    if (!subjectUid || !exerciseId || !hasMoreTrend || trendLoadingMore) return;
-    setTrendLoadingMore(true);
-    setTrendErr(null);
-    try {
-      const page = await fetchExerciseTrendPage(subjectUid, exerciseId, { cursor: trendCursor });
-      setPoints((prev) => [...[...page.points].reverse(), ...prev]);
-      setTrendCursor(page.lastDoc);
-      setHasMoreTrend(page.hasMore);
-    } catch (e) {
-      setTrendErr(e instanceof Error ? e.message : 'Failed to load more');
-    } finally {
-      setTrendLoadingMore(false);
-    }
-  };
+    void loadAllTrend();
+  }, [loadAllTrend]);
 
   const exercisesWithHistory = useMemo(() => exercises.filter((e) => e.fromHistory), [exercises]);
   const heaviestChart = useMemo(() => toHeaviestChartRows(points), [points]);
@@ -155,14 +143,18 @@ export default function TrendsPage() {
 
           <p className="muted" style={{ margin: 0 }}>
             <strong>{exName}</strong> — working sets only (≥1 rep, weight &gt; 0, warm-ups excluded). Epley 1RM caps at{' '}
-            {E1RM_REP_CAP} reps. Showing {points.length}
-            {hasMoreTrend ? '+' : ''} sessions (oldest → newest).
+            {E1RM_REP_CAP} reps.{' '}
+            {trendLoading
+              ? loadProgress > 0
+                ? `Loading full history… ${loadProgress} sessions so far.`
+                : 'Loading full history…'
+              : `${points.length} sessions (oldest → newest).`}
           </p>
 
           {trendErr && <p style={{ color: '#fca5a5', margin: 0 }}>{trendErr}</p>}
-          {trendLoading && points.length === 0 && <p className="muted">Loading trend…</p>}
+          {trendLoading && points.length === 0 && !trendErr && <p className="muted">Loading trend…</p>}
 
-          {!trendLoading && points.length > 0 && (
+          {points.length > 0 && (
             <>
               <TrendLineChart
                 title="Heaviest working set"
@@ -191,7 +183,9 @@ export default function TrendsPage() {
               >
                 <span className="muted">{p.completedAt?.toDate?.().toLocaleDateString?.() ?? '—'}</span>
                 <span style={{ textAlign: 'right', fontSize: '0.875rem' }}>
-                  <span>{p.maxWeight} lb × {p.topSetReps}</span>
+                  <span>
+                    {p.maxWeight} lb × {p.topSetReps}
+                  </span>
                   <span className="muted"> · est. {p.est1RM} lb</span>
                 </span>
               </div>
@@ -200,18 +194,6 @@ export default function TrendsPage() {
               <p className="muted">No sessions with working sets for this exercise.</p>
             )}
           </div>
-
-          {hasMoreTrend && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ width: '100%' }}
-              disabled={trendLoadingMore || trendLoading}
-              onClick={() => void loadTrendMore()}
-            >
-              {trendLoadingMore ? 'Loading…' : `Load older sessions (${TREND_PAGE_SIZE} more)`}
-            </button>
-          )}
         </>
       )}
     </div>
