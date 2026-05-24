@@ -1,24 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubjectUser } from '@/hooks/useSubjectUser';
-import { deleteWorkout, listWorkoutsPage, WORKOUT_HISTORY_PAGE_SIZE } from '@/services/workouts';
+import { createWorkoutFromPrevious, deleteWorkout, listWorkoutsPage, WORKOUT_HISTORY_PAGE_SIZE } from '@/services/workouts';
 import type { Workout } from '@/types/models';
+import { formatWorkoutDate } from '@/utils/formatWorkoutDate';
 
 const HISTORY_START_YEAR = 2016;
-
-function formatSessionWhen(w: Workout): string {
-  const d = w.startedAt?.toDate?.();
-  if (!d) return 'Unknown date';
-  return d.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 function monthGroupKey(w: Workout): string {
   const d = w.startedAt?.toDate?.();
   if (!d) return 'Unknown';
@@ -48,6 +37,7 @@ function groupByMonth(workouts: Workout[]): { key: string; label: string; items:
 export default function HistoryPage() {
   const { user, loading: authLoading } = useAuth();
   const { subjectUid, isCoachView, loading: subjectLoading } = useSubjectUser();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Workout[]>([]);
   const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -56,6 +46,7 @@ export default function HistoryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [repeatingId, setRepeatingId] = useState<string | null>(null);
 
   const yearOptions = useMemo(() => {
     const end = new Date().getFullYear();
@@ -127,10 +118,25 @@ export default function HistoryPage() {
     }
   };
 
+  const handleRepeat = async (workoutId: string) => {
+    if (!user) return;
+    setRepeatingId(workoutId);
+    setErr(null);
+    try {
+      const id = await createWorkoutFromPrevious(user.uid, workoutId);
+      navigate(`/workout/${id}`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not repeat that workout.');
+    } finally {
+      setRepeatingId(null);
+    }
+  };
+
   if (authLoading || subjectLoading) return <div className="layout muted">Loading…</div>;
   if (!user) return <div className="layout muted">Sign in required.</div>;
 
   const canDelete = !isCoachView;
+  const canRepeat = !isCoachView;
 
   return (
     <div className="layout stack">
@@ -163,6 +169,7 @@ export default function HistoryPage() {
         {loading && rows.length === 0
           ? 'Loading sessions…'
           : `Showing ${rows.length} session${rows.length === 1 ? '' : 's'}${yearFilter !== 'all' ? ` in ${yearFilter}` : ''}${hasMore ? ' — more available' : ''}.`}
+        {canRepeat && !loading && rows.length > 0 && ' Tap Repeat to start a new session with the same exercises and weights (reps blank).'}
       </p>
 
       {err && <p style={{ color: '#fca5a5', margin: 0 }}>{err}</p>}
@@ -176,12 +183,23 @@ export default function HistoryPage() {
                 <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                   <Link to={`/workout/${w.id}`} style={{ color: 'inherit', textDecoration: 'none', flex: 1 }}>
                     <div className="stack" style={{ gap: '0.2rem' }}>
-                      <strong style={{ fontWeight: 600 }}>{formatSessionWhen(w)}</strong>
+                      <strong style={{ fontWeight: 600 }}>{formatWorkoutDate(w)}</strong>
                       {w.location && <span className="muted">{w.location}</span>}
                     </div>
                   </Link>
-                  <div className="row" style={{ flexShrink: 0, gap: '0.35rem', alignItems: 'center' }}>
+                  <div className="row" style={{ flexShrink: 0, gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span className="exercise-pill">{w.status}</span>
+                    {canRepeat && w.status === 'completed' && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ padding: '0.35rem 0.6rem' }}
+                        disabled={repeatingId !== null || deletingId !== null}
+                        onClick={() => void handleRepeat(w.id)}
+                      >
+                        {repeatingId === w.id ? '…' : 'Repeat'}
+                      </button>
+                    )}
                     {canDelete && (
                       <button
                         type="button"

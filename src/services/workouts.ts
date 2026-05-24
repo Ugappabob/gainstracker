@@ -21,7 +21,7 @@ import {
 import { getDb } from '@/firebase/config';
 import { deleteDocumentRefsInChunks } from '@/services/batchDelete';
 import { deleteHistoryForWorkout, writeExerciseHistoryEntries } from '@/services/exerciseHistory';
-import type { Workout, WorkoutLine, WorkoutStatus } from '@/types/models';
+import type { Workout, WorkoutLine, WorkoutSet, WorkoutStatus } from '@/types/models';
 
 const workoutsCol = () => collection(getDb(), 'workouts');
 
@@ -46,19 +46,34 @@ export async function createBlankWorkout(ownerUid: string): Promise<string> {
   return ref.id;
 }
 
-export async function createWorkoutFromTemplate(
+/** Same structure as a past session: exercises, set count, and weights; reps cleared. */
+export function setsForRepeat(sets: WorkoutSet[]): WorkoutSet[] {
+  return sets.map((s) => {
+    const next: WorkoutSet = { weight: Number(s.weight) || 0, reps: 0 };
+    if (s.warmUp === true) next.warmUp = true;
+    return next;
+  });
+}
+
+async function createWorkoutWithLines(
   ownerUid: string,
-  templateId: string,
-  lines: { exerciseId: string; exerciseName: string; order: number; sets: { reps: number; weight: number }[] }[],
+  workoutFields: {
+    templateId?: string | null;
+    repeatedFromWorkoutId?: string | null;
+    location?: string | null;
+    title?: string | null;
+  },
+  lines: { exerciseId: string; exerciseName: string; order: number; sets: WorkoutSet[] }[],
 ): Promise<string> {
   const ref = await addDoc(workoutsCol(), {
     ownerUid,
     status: 'in_progress' as WorkoutStatus,
     startedAt: serverTimestamp(),
     completedAt: null,
-    templateId,
-    location: null,
-    title: null,
+    templateId: workoutFields.templateId ?? null,
+    repeatedFromWorkoutId: workoutFields.repeatedFromWorkoutId ?? null,
+    location: workoutFields.location ?? null,
+    title: workoutFields.title ?? null,
   });
   const wid = ref.id;
   const batch = writeBatch(getDb());
@@ -73,6 +88,41 @@ export async function createWorkoutFromTemplate(
   }
   await batch.commit();
   return wid;
+}
+
+export async function createWorkoutFromPrevious(ownerUid: string, sourceWorkoutId: string): Promise<string> {
+  const source = await getWorkout(sourceWorkoutId);
+  if (!source) throw new Error('Workout not found.');
+  if (source.ownerUid !== ownerUid) throw new Error('You can only repeat your own workouts.');
+  if (source.status !== 'completed') throw new Error('Only completed workouts can be repeated.');
+
+  const sourceLines = await listLines(sourceWorkoutId);
+  if (sourceLines.length === 0) throw new Error('That workout has no exercises to repeat.');
+
+  const lines = sourceLines.map((line, i) => ({
+    exerciseId: line.exerciseId,
+    exerciseName: line.exerciseName,
+    order: i,
+    sets: setsForRepeat(line.sets),
+  }));
+
+  return createWorkoutWithLines(
+    ownerUid,
+    {
+      repeatedFromWorkoutId: sourceWorkoutId,
+      location: source.location,
+      title: source.title,
+    },
+    lines,
+  );
+}
+
+export async function createWorkoutFromTemplate(
+  ownerUid: string,
+  templateId: string,
+  lines: { exerciseId: string; exerciseName: string; order: number; sets: WorkoutSet[] }[],
+): Promise<string> {
+  return createWorkoutWithLines(ownerUid, { templateId }, lines);
 }
 
 export async function getWorkout(workoutId: string): Promise<Workout | null> {

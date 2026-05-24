@@ -4,13 +4,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isHeadCoachProfile } from '@/constants/coach';
 import { listTemplates } from '@/services/library';
 import { seedGlobalLibrary } from '@/services/seed';
-import { createBlankWorkout, createWorkoutFromTemplate } from '@/services/workouts';
-import type { WorkoutTemplate } from '@/types/models';
+import { createBlankWorkout, createWorkoutFromPrevious, createWorkoutFromTemplate, listWorkoutsPage } from '@/services/workouts';
+import type { Workout, WorkoutTemplate } from '@/types/models';
+import { formatWorkoutDate } from '@/utils/formatWorkoutDate';
 
 export default function HomePage() {
   const { user, profile, loading, logOut, updateDisplayName } = useAuth();
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
+  const [recentWorkouts, setRecentWorkouts] = useState<Workout[]>([]);
+  const [recentLoadErr, setRecentLoadErr] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
@@ -36,6 +39,22 @@ export default function HomePage() {
   useEffect(() => {
     void refreshTemplates();
   }, [refreshTemplates]);
+
+  const refreshRecentWorkouts = useCallback(async () => {
+    if (!user) return;
+    setRecentLoadErr(null);
+    try {
+      const page = await listWorkoutsPage(user.uid, { pageSize: 40 });
+      setRecentWorkouts(page.workouts.filter((w) => w.status === 'completed').slice(0, 20));
+    } catch (e) {
+      setRecentLoadErr(e instanceof Error ? e.message : 'Could not load recent workouts');
+      setRecentWorkouts([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refreshRecentWorkouts();
+  }, [refreshRecentWorkouts]);
 
   const startBlank = async () => {
     if (!user) return;
@@ -66,6 +85,20 @@ export default function HomePage() {
       navigate(`/workout/${id}`);
     } catch (e) {
       setActionErr(e instanceof Error ? e.message : 'Could not start from template.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const repeatWorkout = async (workoutId: string) => {
+    if (!user) return;
+    setActionErr(null);
+    setBusy(`repeat-${workoutId}`);
+    try {
+      const id = await createWorkoutFromPrevious(user.uid, workoutId);
+      navigate(`/workout/${id}`);
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : 'Could not repeat that workout.');
     } finally {
       setBusy(null);
     }
@@ -201,6 +234,38 @@ export default function HomePage() {
         <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void startBlank()}>
           {busy === 'start' ? 'Starting…' : 'Blank workout'}
         </button>
+      </div>
+
+      <div className="card stack">
+        <h2>Repeat a workout</h2>
+        <p className="muted" style={{ margin: 0 }}>
+          Same exercises, sets, and weights as a past session — reps start blank for you to fill in.
+        </p>
+        {recentLoadErr && <p style={{ color: '#fca5a5', margin: 0 }}>{recentLoadErr}</p>}
+        {!recentLoadErr && recentWorkouts.length === 0 && (
+          <p className="muted" style={{ margin: 0 }}>
+            No completed workouts yet. Finish a session first, or check History.
+          </p>
+        )}
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }} className="stack">
+          {recentWorkouts.map((w) => (
+            <li key={w.id}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ width: '100%', textAlign: 'left' }}
+                disabled={busy !== null}
+                onClick={() => void repeatWorkout(w.id)}
+              >
+                {busy === `repeat-${w.id}` ? 'Starting…' : formatWorkoutDate(w)}
+                {w.location ? ` · ${w.location}` : ''}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <Link to="/history" className="muted" style={{ fontSize: '0.875rem' }}>
+          View all history
+        </Link>
       </div>
 
       <div className="card stack">
