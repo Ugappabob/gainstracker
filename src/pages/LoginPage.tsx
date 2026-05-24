@@ -1,14 +1,25 @@
-import { type FormEvent, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { type FormEvent, useEffect, useState } from 'react';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { normalizeInviteCode } from '@/utils/inviteCode';
 
 export default function LoginPage() {
   const { user, signIn, signUp, loading } = useAuth();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const invite = searchParams.get('invite');
+    if (invite) {
+      setInviteCode(normalizeInviteCode(invite));
+      setMode('signup');
+    }
+  }, [searchParams]);
 
   if (loading) {
     return (
@@ -25,7 +36,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       if (mode === 'signin') await signIn(email.trim(), password);
-      else await signUp(email.trim(), password);
+      else await signUp(email.trim(), password, inviteCode);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
@@ -54,6 +65,19 @@ export default function LoginPage() {
         </button>
       </div>
       <form className="card stack" onSubmit={onSubmit}>
+        {mode === 'signup' && (
+          <label className="stack" style={{ gap: '0.25rem' }}>
+            <span className="muted">Invite code</span>
+            <input
+              autoComplete="off"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(normalizeInviteCode(e.target.value))}
+              required
+              placeholder="From your coach"
+              spellCheck={false}
+            />
+          </label>
+        )}
         <label className="stack" style={{ gap: '0.25rem' }}>
           <span className="muted">Email</span>
           <input autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -75,8 +99,13 @@ export default function LoginPage() {
         </button>
       </form>
       <p className="muted" style={{ margin: 0 }}>
-        New accounts join as <strong>athletes</strong> on your coach&apos;s roster automatically. Coach access is only
-        for <strong>stevenfhulett@gmail.com</strong>.
+        {mode === 'signup' ? (
+          <>
+            New accounts need an <strong>invite code</strong> from your coach and join as athletes on their roster.
+          </>
+        ) : (
+          <>Sign in with the email and password you used when invited.</>
+        )}
       </p>
       <Link to="/" className="muted">
         Home

@@ -94,7 +94,7 @@ service cloud.firestore {
 
     match /config/headCoach {
 
-      allow read: if signedIn();
+      allow get: if true;
 
       allow create: if isHeadCoach()
 
@@ -102,7 +102,13 @@ service cloud.firestore {
 
         && request.resource.data.email == 'stevenfhulett@gmail.com';
 
-      allow update, delete: if false;
+      allow update: if isHeadCoach()
+
+        && request.resource.data.uid == resource.data.uid
+
+        && request.resource.data.email == resource.data.email;
+
+      allow delete: if false;
 
     }
 
@@ -129,6 +135,10 @@ service cloud.firestore {
           && headCoachConfigExists()
 
           && request.resource.data.coachId == headCoachUid()
+
+          && get(/databases/$(database)/documents/config/headCoach).data.signupEnabled != false
+
+          && request.resource.data.inviteCode == get(/databases/$(database)/documents/config/headCoach).data.signupCode
 
         )
 
