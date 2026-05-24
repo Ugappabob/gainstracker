@@ -13,7 +13,7 @@ import {
   syncExerciseHistoryFromWorkout,
   updateLineSets,
 } from '@/services/workouts';
-import type { Workout, WorkoutLine } from '@/types/models';
+import type { Workout, WorkoutLine, WorkoutSet } from '@/types/models';
 import { customExerciseIdFromName } from '@/utils/customExerciseId';
 
 function SetsEditor({
@@ -21,8 +21,8 @@ function SetsEditor({
   onChange,
   readOnly = false,
 }: {
-  sets: { reps: number; weight: number }[];
-  onChange: (next: { reps: number; weight: number }[]) => void;
+  sets: WorkoutSet[];
+  onChange: (next: WorkoutSet[]) => void;
   readOnly?: boolean;
 }) {
   const update = (i: number, field: 'reps' | 'weight', raw: string) => {
@@ -32,11 +32,16 @@ function SetsEditor({
     onChange(next);
   };
 
+  const toggleWarmUp = (i: number) => {
+    const next = sets.map((s, j) => (j === i ? { ...s, warmUp: !s.warmUp } : s));
+    onChange(next);
+  };
+
   return (
     <div className="stack" style={{ gap: '0.35rem' }}>
       {sets.map((s, i) => (
-        <div key={i} className="row" style={{ gap: '0.35rem' }}>
-          <label className="muted" style={{ flex: 1 }}>
+        <div key={i} className={`set-row${s.warmUp ? ' set-row-warmup' : ''}`}>
+          <label className="muted set-field">
             Weight
             <input
               type="number"
@@ -46,7 +51,7 @@ function SetsEditor({
               onChange={(e) => update(i, 'weight', e.target.value)}
             />
           </label>
-          <label className="muted" style={{ flex: 1 }}>
+          <label className="muted set-field">
             Reps
             <input
               type="number"
@@ -56,6 +61,13 @@ function SetsEditor({
               onChange={(e) => update(i, 'reps', e.target.value)}
             />
           </label>
+          {!readOnly && (
+            <label className="row set-warmup-toggle" style={{ gap: '0.35rem', margin: 0 }}>
+              <input type="checkbox" checked={!!s.warmUp} onChange={() => toggleWarmUp(i)} />
+              <span className="muted">Warm-up</span>
+            </label>
+          )}
+          {readOnly && s.warmUp && <span className="muted set-warmup-label">Warm-up</span>}
         </div>
       ))}
     </div>
@@ -89,7 +101,7 @@ function LineBlock({
   }, [line.id, line.sets]);
 
   const scheduleSave = useCallback(
-    (next: { reps: number; weight: number }[]) => {
+    (next: WorkoutSet[]) => {
       if (readOnly) return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(async () => {
@@ -107,14 +119,14 @@ function LineBlock({
     [workoutId, line.id, sessionCompleted, onPersistSets, readOnly],
   );
 
-  const onChange = (next: { reps: number; weight: number }[]) => {
+  const onChange = (next: WorkoutSet[]) => {
     setSets(next);
     scheduleSave(next);
   };
 
   const addSet = () => {
-    const last = sets[sets.length - 1] ?? { reps: 8, weight: 0 };
-    onChange([...sets, { reps: last.reps, weight: last.weight }]);
+    const last = sets[sets.length - 1] ?? { reps: 8, weight: 0, warmUp: false };
+    onChange([...sets, { reps: last.reps, weight: last.weight, warmUp: last.warmUp ?? false }]);
   };
 
   const removeSet = () => {

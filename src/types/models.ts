@@ -16,10 +16,17 @@ export interface Exercise {
   name: string;
 }
 
+/** One logged set (weight × reps). warmUp excludes set from trend working-set math. */
+export interface WorkoutSet {
+  reps: number;
+  weight: number;
+  warmUp?: boolean;
+}
+
 export interface TemplateLine {
   exerciseId: string;
   exerciseName: string;
-  defaultSets: { reps: number; weight: number }[];
+  defaultSets: WorkoutSet[];
 }
 
 export interface WorkoutTemplate {
@@ -46,7 +53,7 @@ export interface WorkoutLine {
   exerciseId: string;
   exerciseName: string;
   order: number;
-  sets: { reps: number; weight: number }[];
+  sets: WorkoutSet[];
 }
 
 export interface ExerciseHistoryEntry {
@@ -56,5 +63,5 @@ export interface ExerciseHistoryEntry {
   exerciseName?: string;
   workoutId: string;
   completedAt: Timestamp;
-  sets: { reps: number; weight: number }[];
+  sets: WorkoutSet[];
 }

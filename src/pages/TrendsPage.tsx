@@ -6,7 +6,6 @@ import { useSubjectUser } from '@/hooks/useSubjectUser';
 import TrendLineChart, { type TrendChartRow } from '@/components/trends/TrendLineChart';
 import { listExercisesForTrends, type TrendExercise } from '@/services/library';
 import { fetchExerciseTrendPage, TREND_PAGE_SIZE, type TrendPoint } from '@/services/trends';
-import { WARMUP_WEIGHT_RATIO } from '@/utils/workingSets';
 import { E1RM_REP_CAP } from '@/utils/oneRepMax';
 
 function pointDateMs(p: TrendPoint): number {
@@ -115,7 +114,6 @@ export default function TrendsPage() {
   if (!user) return <div className="layout muted">Sign in required.</div>;
 
   const exName = exercises.find((e) => e.id === exerciseId)?.name ?? 'Exercise';
-  const warmupPct = Math.round(WARMUP_WEIGHT_RATIO * 100);
 
   return (
     <div className="layout stack">
@@ -156,8 +154,8 @@ export default function TrendsPage() {
           </label>
 
           <p className="muted" style={{ margin: 0 }}>
-            <strong>{exName}</strong> — working sets only (≥1 rep, weight &gt; 0, not below {warmupPct}% of session
-            top). Epley 1RM caps at {E1RM_REP_CAP} reps. Showing {points.length}
+            <strong>{exName}</strong> — working sets only (≥1 rep, weight &gt; 0, warm-ups excluded). Epley 1RM caps at{' '}
+            {E1RM_REP_CAP} reps. Showing {points.length}
             {hasMoreTrend ? '+' : ''} sessions (oldest → newest).
           </p>
 

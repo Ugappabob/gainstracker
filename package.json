@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "vitest run",
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy",
     "deploy:hosting": "npm run build && firebase deploy --only hosting",
@@ -29,6 +30,7 @@
     "google-auth-library": "^9.15.1",
     "typescript": "~5.8.3",
     "vite": "^6.3.4",
+    "vitest": "^3.2.4",
     "vite-plugin-pwa": "^1.0.0",
     "xlsx": "^0.18.5"
   }

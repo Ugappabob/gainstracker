@@ -1,6 +1,7 @@
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   type User,
@@ -14,6 +15,7 @@ import {
   ensureHeadCoachConfig,
   fetchHeadCoachUid,
 } from '@/services/headCoachConfig';
+import { updateUserDisplayName } from '@/services/users';
 import { normalizeInviteCode } from '@/utils/inviteCode';
 import type { UserProfile } from '@/types/models';
 
@@ -23,6 +25,8 @@ type AuthState = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, inviteCode?: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updateDisplayName: (displayName: string) => Promise<void>;
   logOut: () => Promise<void>;
 };
 
@@ -91,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       signIn: async (email, password) => {
-        await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+        await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
       },
       signUp: async (email, password, inviteCode) => {
         const normalized = email.trim().toLowerCase();
@@ -121,6 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           inviteCode: invite,
           createdAt: serverTimestamp(),
         });
+      },
+      resetPassword: async (email) => {
+        const normalized = email.trim().toLowerCase();
+        if (!normalized) throw new Error('Enter your email address.');
+        await sendPasswordResetEmail(getFirebaseAuth(), normalized);
+      },
+      updateDisplayName: async (displayName) => {
+        if (!user) throw new Error('Not signed in.');
+        const trimmed = displayName.trim();
+        if (trimmed.length > 80) throw new Error('Display name is too long (max 80 characters).');
+        await updateUserDisplayName(user.uid, trimmed.length > 0 ? trimmed : null);
+        setProfile((prev) => (prev ? { ...prev, displayName: trimmed.length > 0 ? trimmed : null } : prev));
       },
       logOut: async () => {
         await signOut(getFirebaseAuth());

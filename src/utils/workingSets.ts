@@ -1,8 +1,7 @@
 import { estimateOneRepMaxEpley, roundLb } from '@/utils/oneRepMax';
+import type { WorkoutSet } from '@/types/models';
 
-export type WorkoutSet = { reps: number; weight: number };
-
-/** Sets below this fraction of the session's top weight are treated as warm-ups (no tag in data). */
+/** Legacy imports: sets below this fraction of session top weight are treated as warm-ups when warmUp is unset. */
 export const WARMUP_WEIGHT_RATIO = 0.9;
 
 export function isLoggedSet(s: WorkoutSet): boolean {
@@ -11,13 +10,22 @@ export function isLoggedSet(s: WorkoutSet): boolean {
   return Number.isFinite(w) && w > 0 && Number.isFinite(r) && r >= 1;
 }
 
-/** Logged sets that are not warm-ups (weight ≥ 90% of session top). */
+function isExplicitWarmUp(s: WorkoutSet): boolean {
+  return s.warmUp === true;
+}
+
+function isLegacyWarmUpByWeight(s: WorkoutSet, sessionMax: number): boolean {
+  if (s.warmUp === false) return false;
+  if (s.warmUp === true) return true;
+  return Number(s.weight) < sessionMax * WARMUP_WEIGHT_RATIO;
+}
+
+/** Logged sets that count as working sets for trends. */
 export function workingSetsInSession(sets: WorkoutSet[]): WorkoutSet[] {
   const logged = sets.filter(isLoggedSet);
   if (logged.length === 0) return [];
   const sessionMax = Math.max(...logged.map((s) => Number(s.weight)));
-  const floor = sessionMax * WARMUP_WEIGHT_RATIO;
-  return logged.filter((s) => Number(s.weight) >= floor);
+  return logged.filter((s) => !isExplicitWarmUp(s) && !isLegacyWarmUpByWeight(s, sessionMax));
 }
 
 export function heaviestWorkingSet(sets: WorkoutSet[]): { weight: number; reps: number } | null {

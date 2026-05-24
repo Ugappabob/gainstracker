@@ -151,3 +151,39 @@ h2 {
 .history-session-card {
   padding: 0.75rem 1rem;
 }
+
+.set-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: flex-end;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+
+.set-row-warmup {
+  opacity: 0.75;
+  border-style: dashed;
+}
+
+.set-field {
+  flex: 1;
+  min-width: 5rem;
+}
+
+.set-warmup-toggle {
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.set-warmup-label {
+  font-size: 0.8125rem;
+  align-self: center;
+}
+
+input[type='checkbox'] {
+  width: auto;
+  accent-color: #38bdf8;
+}

@@ -8,12 +8,19 @@ import { createBlankWorkout, createWorkoutFromTemplate } from '@/services/workou
 import type { WorkoutTemplate } from '@/types/models';
 
 export default function HomePage() {
-  const { user, profile, loading, logOut } = useAuth();
+  const { user, profile, loading, logOut, updateDisplayName } = useAuth();
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDisplayName(profile?.displayName ?? '');
+  }, [profile?.displayName]);
 
   const refreshTemplates = useCallback(async () => {
     if (!user) return;
@@ -64,6 +71,20 @@ export default function HomePage() {
     }
   };
 
+  const saveDisplayName = async () => {
+    setProfileBusy(true);
+    setProfileMsg(null);
+    setActionErr(null);
+    try {
+      await updateDisplayName(displayName);
+      setProfileMsg('Display name saved.');
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : 'Could not save display name.');
+    } finally {
+      setProfileBusy(false);
+    }
+  };
+
   const installLibrary = async () => {
     setActionErr(null);
     setBusy('seed');
@@ -107,6 +128,8 @@ export default function HomePage() {
         <div>
           <h1>Home</h1>
           <p className="muted" style={{ margin: 0 }}>
+            {profile?.displayName && <strong>{profile.displayName}</strong>}
+            {profile?.displayName && profile?.email ? ' · ' : null}
             {profile?.email ?? user.email} · {profile?.role ?? '…'}
           </p>
         </div>
@@ -134,6 +157,27 @@ export default function HomePage() {
           {actionErr}
         </div>
       )}
+
+      <div className="card stack">
+        <h2>Profile</h2>
+        <p className="muted" style={{ margin: 0 }}>
+          Your coach sees this name on the roster.
+        </p>
+        <label className="stack" style={{ gap: '0.25rem' }}>
+          <span className="muted">Display name</span>
+          <input
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="e.g. Alex"
+            maxLength={80}
+            autoComplete="name"
+          />
+        </label>
+        {profileMsg && <p style={{ color: '#86efac', margin: 0 }}>{profileMsg}</p>}
+        <button type="button" className="btn btn-primary" disabled={profileBusy} onClick={() => void saveDisplayName()}>
+          {profileBusy ? 'Saving…' : 'Save name'}
+        </button>
+      </div>
 
       {isHeadCoachProfile(profile, user.email) && (
         <div className="card stack">
